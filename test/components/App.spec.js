@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { filesOf, makeRecipe } from '../helpers.js'
+import { repositoryUrl } from '../config.fixture.js'
 
 vi.mock('../../src/services/github.js', async () => {
   const actual = await vi.importActual('../../src/services/github.js')
@@ -79,7 +80,7 @@ describe('App', () => {
 
   it('links the source repository from the footer', async () => {
     const app = await mountApp()
-    const link = app.findAll('a').find(a => a.attributes('href') === 'https://github.com/ssaunier/recipes')
+    const link = app.findAll('a').find(a => a.attributes('href') === repositoryUrl)
 
     expect(link.attributes('rel')).toBe('noreferrer')
   })
@@ -88,7 +89,7 @@ describe('App', () => {
     const app = await mountApp()
     const link = app.findAll('a').find(a => a.text() === 'abc1234')
 
-    expect(link.attributes('href')).toBe('https://github.com/ssaunier/recipes/commit/abc1234def')
+    expect(link.attributes('href')).toBe(`${repositoryUrl}/commit/abc1234def`)
     expect(link.attributes('target')).toBe('_blank')
   })
 

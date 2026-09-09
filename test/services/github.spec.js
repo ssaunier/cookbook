@@ -133,7 +133,10 @@ describe('toRecipe', () => {
 })
 
 describe('source repository configuration', () => {
-  // The whole point of src/config.js: a fork edits it and nothing else.
+  // The whole point of src/config.js: a fork edits it and nothing else. Every
+  // other spec runs against the fixture test/setup.js pins in its place; this
+  // block is where a config actually reaching the GitHub URLs is proven, by
+  // mocking in a fork that shares no value with either.
   const forked = {
     recipesRepo: { owner: 'octocat', repo: 'dishes', branch: 'trunk', directory: 'plats' },
     repositoryUrl: 'https://github.com/octocat/dishes'
