@@ -66,6 +66,52 @@ describe('RecipeIndexView', () => {
     expect(view.text()).toContain('Guacamole')
   })
 
+  it('reads the tag out of the URL', async () => {
+    const view = await mountView(RecipeIndexView, { props: { recipes }, route: '/?tag=dessert' })
+    expect(view.text()).toContain('Tarte Tatin')
+    expect(view.text()).not.toContain('Guacamole')
+  })
+
+  // Changing only the query string keeps this component mounted, so the tag
+  // has to be re-read on navigation and not just at setup: this is a shared
+  // link followed while the index is already on screen.
+  it('applies a tag that arrives after the page is on screen', async () => {
+    const view = await mountView(RecipeIndexView, { props: { recipes } })
+    expect(view.text()).toContain('Guacamole')
+
+    await view.vm.$router.push('/?tag=dessert')
+    await view.vm.$nextTick()
+
+    expect(view.text()).toContain('Tarte Tatin')
+    expect(view.text()).not.toContain('Guacamole')
+  })
+
+  it('clears the filter when the tag leaves the URL again', async () => {
+    const view = await mountView(RecipeIndexView, { props: { recipes }, route: '/?tag=dessert' })
+    expect(view.text()).not.toContain('Guacamole')
+
+    await view.vm.$router.push('/')
+    await view.vm.$nextTick()
+
+    expect(view.text()).toContain('Guacamole')
+  })
+
+  it('matches an accented tag however the URL spells its accents', async () => {
+    const accented = [
+      makeRecipe({ slug: 'lasagnes', title: 'Lasagnes', tags: ['végétarien'] }),
+      makeRecipe({ slug: 'pita', title: 'Pain Pita', tags: ['boulangerie'] })
+    ]
+    // 'e' plus a combining accent, the decomposed spelling of the precomposed
+    // 'é' the recipe itself carries. Both render as végétarien.
+    const view = await mountView(RecipeIndexView, {
+      props: { recipes: accented },
+      route: '/?tag=ve%CC%81ge%CC%81tarien'
+    })
+
+    expect(view.text()).toContain('Lasagnes')
+    expect(view.text()).not.toContain('Pain Pita')
+  })
+
   it('shows the empty state when nothing matches', async () => {
     const view = await mountView(RecipeIndexView, { props: { recipes } })
     await view.find('#recipe-search').setValue('zzzz')
