@@ -58,11 +58,17 @@ export function useRecipes() {
         return
       }
 
-      const files = await downloadRecipes(cachedFiles)
+      const { files, complete } = await downloadRecipes(latestSha, cachedFiles)
       cachedFiles = files
       downloaded.value = filesToRecipes(files)
-      cachedSha.value = latestSha
-      saveRecipeCache({ sha: latestSha, files, version: __APP_VERSION__ })
+      // A download that skipped a file, or kept a stale copy of one, is not
+      // recorded as being at `latestSha`: the sha stays where it was, so the
+      // next refresh sees a mismatch and calls downloadRecipes again, which
+      // then only fetches what is still missing. Stamping it anyway would
+      // short-circuit every refresh until the repository next changed, and a
+      // recipe whose very first fetch failed would stay invisible until then.
+      if (complete) cachedSha.value = latestSha
+      saveRecipeCache({ sha: cachedSha.value, files, version: __APP_VERSION__ })
     } catch (err) {
       if (!downloaded.value.length) {
         error.value = err?.message || i18n.global.t('app.unknownError')

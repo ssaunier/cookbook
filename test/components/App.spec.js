@@ -18,7 +18,7 @@ beforeEach(async () => {
   vi.resetModules()
   github = await import('../../src/services/github.js')
   github.getLatestSha.mockReset().mockResolvedValue('abc1234def')
-  github.downloadRecipes.mockReset().mockResolvedValue(filesOf([makeRecipe()]))
+  github.downloadRecipes.mockReset().mockResolvedValue({ files: filesOf([makeRecipe()]), complete: true })
   ;({ i18n } = await import('../../src/i18n/index.js'))
   ;({ routes } = await import('../../src/router.js'))
   App = (await import('../../src/App.vue')).default

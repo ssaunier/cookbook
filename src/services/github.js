@@ -4,7 +4,7 @@ import { recipesRepo } from '../config.js'
 
 const { owner, repo, branch, directory } = recipesRepo
 const API = `https://api.github.com/repos/${owner}/${repo}`
-const RAW = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}`
+const RAW = `https://raw.githubusercontent.com/${owner}/${repo}`
 
 /** A trailing slash unless the recipes sit at the repository root. */
 const PREFIX = directory ? `${directory.replace(/^\/+|\/+$/g, '')}/` : ''
@@ -51,18 +51,33 @@ async function mapWithConcurrency(items, limit, fn) {
 }
 
 /**
- * Downloads every recipe file, reusing `previousFiles` for anything whose
- * git blob sha hasn't changed. Without this, any change anywhere in the
- * repository — even one unrelated to recipes — would re-download every
- * recipe file on the next visit, since the only thing tracked before was the
- * repository's own HEAD commit sha, not each file's own sha.
+ * Downloads every recipe file as of commit `sha`, reusing `previousFiles`
+ * for anything whose git blob sha hasn't changed. Without this, any change
+ * anywhere in the repository (even one unrelated to recipes) would
+ * re-download every recipe file on the next visit, since the only thing
+ * tracked before was the repository's own HEAD commit sha, not each file's
+ * own sha.
  *
- * Returns a map keyed by path rather than a flat array, so a caller can pass
- * it straight back in as next time's `previousFiles`; see `filesToRecipes()`
- * for the flat list the rest of the app actually consumes.
+ * Everything is addressed by that commit sha rather than by branch name, and
+ * on purpose: GitHub serves both the API and raw.githubusercontent.com with
+ * a public max-age (60s and 300s respectively), so a URL naming the branch
+ * can come back from the browser's or GitHub's own cache showing the tree or
+ * a file as it was *before* the commit `getLatestSha()` just reported. That
+ * left a new recipe missing, or a modified one stale, while the cache was
+ * stamped as up to date with the new HEAD. A sha-addressed URL never changes
+ * meaning, so a cached response for it is always the right one.
+ *
+ * Returns `files`, a map keyed by path rather than a flat array so a caller
+ * can pass it straight back in as next time's `previousFiles` (see
+ * `filesToRecipes()` for the flat list the rest of the app actually
+ * consumes), and `complete`, false when at least one file could not be
+ * fetched and is either missing from `files` or still sitting there as its
+ * previous entry. A caller should not record such a result as being at
+ * `sha`, or the missing file would not be tried again until the repository
+ * next changes.
  */
-export async function downloadRecipes(previousFiles = {}) {
-  const tree = await githubFetch(`${API}/git/trees/${branch}?recursive=1`)
+export async function downloadRecipes(sha, previousFiles = {}) {
+  const tree = await githubFetch(`${API}/git/trees/${sha}?recursive=1`)
   if (tree.truncated) {
     throw new Error('GitHub returned a truncated repository tree. The source repository is too large for this client-side loader.')
   }
@@ -82,19 +97,21 @@ export async function downloadRecipes(previousFiles = {}) {
   // left the tree (deleted or renamed upstream) and is dropped by simply
   // never being copied into `files`.
 
-  await mapWithConcurrency(toFetch, RAW_FETCH_CONCURRENCY, async ({ path, sha }) => {
+  let complete = true
+  await mapWithConcurrency(toFetch, RAW_FETCH_CONCURRENCY, async ({ path, sha: blobSha }) => {
     let text
     try {
-      const response = await fetch(`${RAW}/${encodeURI(path)}`)
+      const response = await fetch(`${RAW}/${sha}/${encodeURI(path)}`)
       if (!response.ok) throw new Error(`Unable to download ${path}`)
       text = await response.text()
     } catch (error) {
       // A file that fails to fetch keeps its previous entry — under its OLD
       // sha, not this tree's — so it stays on the site with its last-known
-      // content and is tried again next time the repository changes, rather
-      // than either vanishing or failing every other recipe's load too.
-      // Stamping the new sha here instead would mark unverified content as
-      // up to date and stop it from ever being retried.
+      // content and is tried again on the next refresh, rather than either
+      // vanishing or failing every other recipe's load too. Stamping the new
+      // sha here instead would mark unverified content as up to date and
+      // stop it from ever being retried.
+      complete = false
       const stale = previousFiles[path]
       if (stale) {
         console.warn(`Keeping the cached copy of ${path}: ${error.message}`)
@@ -104,10 +121,10 @@ export async function downloadRecipes(previousFiles = {}) {
       }
       return
     }
-    files[path] = { sha, recipe: toRecipe(text, path) }
+    files[path] = { sha: blobSha, recipe: toRecipe(text, path) }
   })
 
-  return files
+  return { files, complete }
 }
 
 /**

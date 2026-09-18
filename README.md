@@ -61,6 +61,11 @@ recursive tree listing) regardless of how many recipes exist. Each recipe file's
 blob sha is cached alongside its parsed content, so once the repository's HEAD moves, only
 the files whose blob sha actually changed are re-fetched — not the whole collection —
 bounded to a handful of simultaneous requests to `raw.githubusercontent.com` at a time.
+The tree listing and the raw files are always requested by that head commit's sha, never
+by branch name: GitHub serves both with a public `max-age`, and a branch-named URL can
+come back from a cache primed just before the commit, showing a new recipe as absent or a
+modified one as unchanged. If a raw file still fails to download, the head sha is not
+recorded, so the next load retries just that file rather than waiting for another commit.
 
 Recipes must follow the [RecipeMD specification](https://recipemd.org/specification.html).
 Note in particular that amounts are wrapped in emphasis:

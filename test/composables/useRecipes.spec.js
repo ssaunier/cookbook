@@ -23,6 +23,9 @@ const zulu = makeRecipe({ slug: 'z', title: 'Zulu' })
 /** A files-map entry, the shape both the cache and `downloadRecipes()` use. */
 const fileEntry = (recipe, sha = 'sha') => ({ sha, recipe })
 
+/** What `downloadRecipes()` resolves to: a files map, complete unless said otherwise. */
+const download = (files, complete = true) => ({ files, complete })
+
 /**
  * Seeds the cache and re-imports the composable, the way a page load finds
  * it. The cache is read once at import, so a test that writes to
@@ -43,7 +46,7 @@ const reloadWithStaleCache = cache => reloadWithCache(cache, 'old-build')
 describe('refresh', () => {
   it('downloads and caches when there is no cache', async () => {
     github.getLatestSha.mockResolvedValue('sha1')
-    github.downloadRecipes.mockResolvedValue({ z: fileEntry(zulu), a: fileEntry(alpha) })
+    github.downloadRecipes.mockResolvedValue(download({ z: fileEntry(zulu), a: fileEntry(alpha) }))
 
     const { recipes, refresh, cachedSha } = useRecipes()
     await refresh()
@@ -64,7 +67,7 @@ describe('refresh', () => {
   it('re-downloads when the remote sha has moved on', async () => {
     const { store, github: gh } = await reloadWithCache({ sha: 'old', files: { a: fileEntry(alpha) } })
     gh.getLatestSha.mockResolvedValue('new')
-    gh.downloadRecipes.mockResolvedValue({ z: fileEntry(zulu) })
+    gh.downloadRecipes.mockResolvedValue(download({ z: fileEntry(zulu) }))
 
     await store.refresh()
 
@@ -72,20 +75,20 @@ describe('refresh', () => {
     expect(store.recipes.value.map(r => r.title)).toEqual(['Zulu'])
   })
 
-  it('passes the previously cached files to downloadRecipes so it can diff blob shas', async () => {
+  it('passes the new sha and the previously cached files to downloadRecipes so it can diff blob shas', async () => {
     const previousFiles = { a: fileEntry(alpha, 'sha-a') }
     const { store, github: gh } = await reloadWithCache({ sha: 'old', files: previousFiles })
     gh.getLatestSha.mockResolvedValue('new')
-    gh.downloadRecipes.mockResolvedValue(previousFiles)
+    gh.downloadRecipes.mockResolvedValue(download(previousFiles))
 
     await store.refresh()
-    expect(gh.downloadRecipes).toHaveBeenCalledWith(previousFiles)
+    expect(gh.downloadRecipes).toHaveBeenCalledWith('new', previousFiles)
   })
 
   it('shows a cache from an older app version while re-downloading it in full', async () => {
     const { store, github: gh } = await reloadWithStaleCache({ sha: 'sha1', files: { a: fileEntry(alpha) } })
     gh.getLatestSha.mockResolvedValue('sha1')
-    gh.downloadRecipes.mockResolvedValue({ z: fileEntry(zulu) })
+    gh.downloadRecipes.mockResolvedValue(download({ z: fileEntry(zulu) }))
 
     expect(store.recipes.value.map(r => r.title)).toEqual(['Alpha'])
 
@@ -93,17 +96,54 @@ describe('refresh', () => {
 
     // Re-downloaded despite the unchanged sha, and without the stale files,
     // so every recipe is fetched and parsed again by this version's parser.
-    expect(gh.downloadRecipes).toHaveBeenCalledWith({})
+    expect(gh.downloadRecipes).toHaveBeenCalledWith('sha1', {})
     expect(store.recipes.value.map(r => r.title)).toEqual(['Zulu'])
   })
 
   it('will not run two refreshes at once', async () => {
     github.getLatestSha.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve('sha1'), 5)))
-    github.downloadRecipes.mockResolvedValue({ a: fileEntry(alpha) })
+    github.downloadRecipes.mockResolvedValue(download({ a: fileEntry(alpha) }))
 
     const { refresh } = useRecipes()
     await Promise.all([refresh(), refresh()])
     expect(github.getLatestSha).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('an incomplete download', () => {
+  // The case a new recipe hit in production: the head sha moved, the tree
+  // listed the new file, but its raw fetch failed. Recording the new sha
+  // regardless would have every later refresh return early, hiding the
+  // recipe until the repository next changed for any reason at all.
+  it('keeps the previous sha so the next refresh tries the missing file again', async () => {
+    const { store, github: gh } = await reloadWithCache({ sha: 'old', files: { a: fileEntry(alpha) } })
+    gh.getLatestSha.mockResolvedValue('new')
+    gh.downloadRecipes.mockResolvedValue(download({ a: fileEntry(alpha) }, false))
+
+    await store.refresh()
+
+    expect(store.cachedSha.value).toBe('old')
+    expect(JSON.parse(localStorage.getItem('cookbook:recipe-cache:v3')).sha).toBe('old')
+
+    gh.downloadRecipes.mockResolvedValue(download({ a: fileEntry(alpha), z: fileEntry(zulu) }))
+    await store.refresh()
+
+    expect(gh.downloadRecipes).toHaveBeenCalledTimes(2)
+    expect(gh.downloadRecipes).toHaveBeenLastCalledWith('new', { a: fileEntry(alpha) })
+    expect(store.cachedSha.value).toBe('new')
+    expect(store.recipes.value.map(r => r.title)).toEqual(['Alpha', 'Zulu'])
+  })
+
+  it('still shows and caches whatever did download', async () => {
+    github.getLatestSha.mockResolvedValue('sha1')
+    github.downloadRecipes.mockResolvedValue(download({ a: fileEntry(alpha) }, false))
+
+    const { recipes, refresh, cachedSha } = useRecipes()
+    await refresh()
+
+    expect(recipes.value.map(r => r.title)).toEqual(['Alpha'])
+    expect(cachedSha.value).toBe('')
+    expect(JSON.parse(localStorage.getItem('cookbook:recipe-cache:v3')).files).toEqual({ a: fileEntry(alpha) })
   })
 })
 
@@ -151,11 +191,11 @@ describe('failure handling', () => {
 describe('ordering', () => {
   it('re-sorts when the locale changes, without re-downloading', async () => {
     github.getLatestSha.mockResolvedValue('sha1')
-    github.downloadRecipes.mockResolvedValue({
+    github.downloadRecipes.mockResolvedValue(download({
       c: fileEntry(makeRecipe({ slug: 'c', title: 'Cote' })),
       b: fileEntry(makeRecipe({ slug: 'b', title: 'Côte' })),
       a: fileEntry(makeRecipe({ slug: 'a', title: 'Ananas' }))
-    })
+    }))
 
     const { recipes, refresh } = useRecipes()
     await refresh()

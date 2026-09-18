@@ -155,11 +155,11 @@ describe('source repository configuration', () => {
     })
     const github = await withForkedConfig()
 
-    const recipes = github.filesToRecipes(await github.downloadRecipes())
+    const recipes = github.filesToRecipes((await github.downloadRecipes('c0ffee')).files)
     const urls = fetch.mock.calls.map(([url]) => String(url))
 
-    expect(urls[0]).toBe('https://api.github.com/repos/octocat/dishes/git/trees/trunk?recursive=1')
-    expect(urls[1]).toBe('https://raw.githubusercontent.com/octocat/dishes/trunk/plats/a/recipe.md')
+    expect(urls[0]).toBe('https://api.github.com/repos/octocat/dishes/git/trees/c0ffee?recursive=1')
+    expect(urls[1]).toBe('https://raw.githubusercontent.com/octocat/dishes/c0ffee/plats/a/recipe.md')
     // The configured directory drives both the filter and the slug.
     expect(recipes.map(item => item.slug)).toEqual(['a'])
   })
@@ -180,7 +180,7 @@ describe('source repository configuration', () => {
     stubFetch({ '/git/trees/': tree('anywhere/a.md'), 'anywhere/a.md': fullRecipe })
     const github = await import('../../src/services/github.js')
 
-    const recipes = github.filesToRecipes(await github.downloadRecipes())
+    const recipes = github.filesToRecipes((await github.downloadRecipes('head')).files)
     expect(recipes.map(item => item.slug)).toEqual(['anywhere-a'])
   })
 })
@@ -205,13 +205,29 @@ describe('downloadRecipes', () => {
       'recipes/b/recipe.md': groups
     })
 
-    const recipes = filesToRecipes(await downloadRecipes())
-    expect(recipes.map(item => item.slug).sort()).toEqual(['a', 'b'])
+    const { files, complete } = await downloadRecipes('head')
+    expect(filesToRecipes(files).map(item => item.slug).sort()).toEqual(['a', 'b'])
+    expect(complete).toBe(true)
+  })
+
+  it('addresses the tree and every raw file by the commit sha, never the branch', async () => {
+    // Both endpoints are served with a public max-age, so a URL naming the
+    // branch can come back from a cache primed before the commit being
+    // loaded; a sha-addressed URL cannot mean anything but that commit.
+    const fetch = stubFetch({ '/git/trees/': tree('recipes/a/recipe.md'), 'recipes/a/recipe.md': fullRecipe })
+
+    await downloadRecipes('62388cd')
+
+    const urls = fetch.mock.calls.map(([url]) => String(url))
+    expect(urls).toEqual([
+      'https://api.github.com/repos/test-owner/test-recipes/git/trees/62388cd?recursive=1',
+      'https://raw.githubusercontent.com/test-owner/test-recipes/62388cd/recipes/a/recipe.md'
+    ])
   })
 
   it('ignores files outside recipes/', async () => {
     stubFetch({ '/git/trees/': tree('README.md', 'docs/notes.md'), 'x': '' })
-    expect(filesToRecipes(await downloadRecipes())).toEqual([])
+    expect(filesToRecipes((await downloadRecipes('head')).files)).toEqual([])
   })
 
   it('skips a malformed recipe instead of failing the batch', async () => {
@@ -222,14 +238,18 @@ describe('downloadRecipes', () => {
       'recipes/bad/recipe.md': 'no title here'
     })
 
-    const recipes = filesToRecipes(await downloadRecipes())
+    const { files, complete } = await downloadRecipes('head')
+    const recipes = filesToRecipes(files)
     expect(recipes).toHaveLength(1)
     expect(recipes[0].slug).toBe('good')
+    // A parse failure is a verdict on the file's content, not a failed
+    // fetch: the download did everything it could with this commit.
+    expect(complete).toBe(true)
   })
 
   it('refuses a truncated tree rather than showing a partial cookbook', async () => {
     stubFetch({ '/git/trees/': { truncated: true, tree: [] } })
-    await expect(downloadRecipes()).rejects.toThrow(/truncated/i)
+    await expect(downloadRecipes('head')).rejects.toThrow(/truncated/i)
   })
 
   describe('incremental caching by blob sha', () => {
@@ -237,7 +257,7 @@ describe('downloadRecipes', () => {
       const fetch = stubFetch({ '/git/trees/': tree({ path: 'recipes/a/recipe.md', sha: 'blob-a' }) })
       const previousFiles = { 'recipes/a/recipe.md': { sha: 'blob-a', recipe: toRecipe(fullRecipe, 'recipes/a/recipe.md') } }
 
-      const files = await downloadRecipes(previousFiles)
+      const { files } = await downloadRecipes('head', previousFiles)
 
       expect(files['recipes/a/recipe.md']).toBe(previousFiles['recipes/a/recipe.md'])
       expect(fetch).toHaveBeenCalledTimes(1) // only the tree listing, no raw fetch
@@ -256,7 +276,7 @@ describe('downloadRecipes', () => {
         'recipes/b/recipe.md': { sha: 'blob-b-old', recipe: toRecipe(fullRecipe, 'recipes/b/recipe.md') }
       }
 
-      await downloadRecipes(previousFiles)
+      await downloadRecipes('head', previousFiles)
 
       const rawUrls = fetch.mock.calls.map(([url]) => String(url)).filter(url => !url.includes('git/trees'))
       expect(rawUrls).toEqual([expect.stringContaining('recipes/b/recipe.md')])
@@ -269,7 +289,7 @@ describe('downloadRecipes', () => {
         'recipes/gone/recipe.md': { sha: 'blob-gone', recipe: toRecipe(groups, 'recipes/gone/recipe.md') }
       }
 
-      const files = await downloadRecipes(previousFiles)
+      const { files } = await downloadRecipes('head', previousFiles)
       expect(Object.keys(files)).toEqual(['recipes/a/recipe.md'])
     })
 
@@ -277,7 +297,7 @@ describe('downloadRecipes', () => {
       const fetch = stubFetch({ '/git/trees/': tree({ path: 'recipes/bad/recipe.md', sha: 'blob-bad' }) })
       const previousFiles = { 'recipes/bad/recipe.md': { sha: 'blob-bad', recipe: null } }
 
-      const files = await downloadRecipes(previousFiles)
+      const { files } = await downloadRecipes('head', previousFiles)
 
       expect(files['recipes/bad/recipe.md']).toEqual({ sha: 'blob-bad', recipe: null })
       expect(fetch).toHaveBeenCalledTimes(1)
@@ -292,24 +312,29 @@ describe('downloadRecipes', () => {
           : { ok: false, status: 500 }))
       const staleEntry = { sha: 'blob-a-old', recipe: toRecipe(fullRecipe, 'recipes/a/recipe.md') }
 
-      const files = await downloadRecipes({ 'recipes/a/recipe.md': staleEntry })
+      const { files, complete } = await downloadRecipes('head', { 'recipes/a/recipe.md': staleEntry })
 
       // The OLD entry (old sha included) is kept, not a new one under the
       // tree's current sha — so it is tried again next time, rather than
       // being wrongly marked as verified against unfetched content.
       expect(files['recipes/a/recipe.md']).toBe(staleEntry)
+      expect(complete).toBe(false)
       expect(console.warn).toHaveBeenCalled()
     })
 
-    it('drops a file that fails to fetch when there is no cached copy', async () => {
+    it('drops a file that fails to fetch when there is no cached copy, and says so', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {})
       vi.stubGlobal('fetch', vi.fn(async url =>
         String(url).includes('/git/trees/')
           ? { ok: true, json: async () => tree('recipes/a/recipe.md') }
           : { ok: false, status: 500 }))
 
-      const files = await downloadRecipes()
+      const { files, complete } = await downloadRecipes('head')
       expect(files).toEqual({})
+      // Nothing in `files` records that this file exists, so `complete` is
+      // the caller's only way to know the result must not be stamped as
+      // being at this commit.
+      expect(complete).toBe(false)
     })
 
     it('bounds concurrency to N simultaneous raw fetches', async () => {
@@ -330,7 +355,7 @@ describe('downloadRecipes', () => {
         return held.then(() => { inFlight--; return { ok: true, text: async () => fullRecipe } })
       }))
 
-      const done = downloadRecipes()
+      const done = downloadRecipes('head')
 
       // First wave: exactly the concurrency cap should be in flight at once.
       await vi.waitFor(() => expect(pending.length).toBe(RAW_FETCH_CONCURRENCY))

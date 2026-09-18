@@ -26,7 +26,7 @@ let nextSha = 0
  */
 async function addRecipe(recipe, multiplier) {
   github.getLatestSha.mockResolvedValue(`sha${nextSha++}`)
-  github.downloadRecipes.mockResolvedValue(filesOf([recipe]))
+  github.downloadRecipes.mockResolvedValue({ files: filesOf([recipe]), complete: true })
   await refresh()
   list.addRecipe(recipe, multiplier)
 }
