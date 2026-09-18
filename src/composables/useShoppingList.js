@@ -2,7 +2,7 @@ import { computed, reactive } from 'vue'
 import { loadAppState, saveAppState } from '../services/storage.js'
 import { toBaseAmount } from '../services/units.js'
 import { densityOf } from '../services/densities.js'
-import { isAlwaysExcludedIngredient } from '../services/ingredientExclusions.js'
+import { isAlwaysExcludedIngredient, normalizeIngredientName } from '../services/ingredientExclusions.js'
 import { useRecipes } from './useRecipes.js'
 
 const state = reactive(loadAppState())
@@ -20,6 +20,15 @@ function persist() {
 const itemKey = (name, unit) => `${name} ${unit}`
 
 /**
+ * Removing a row means "I already have this", which is about the ingredient
+ * and not about how the recipe measured it. So exclusions are keyed by the
+ * name alone, not by the row id: olive oil removed while a recipe wanted
+ * "3 cuillères à soupe" of it stays gone when the next one wants "20 g",
+ * even though those two land on different rows.
+ */
+const isExcluded = name => state.excluded.includes(normalizeIngredientName(name))
+
+/**
  * Folds one ingredient into the rows being built, summing it onto the
  * existing row when something else already asked for the same thing in the
  * same unit. Both recipes and hand-added extras go through here, which is
@@ -27,12 +36,13 @@ const itemKey = (name, unit) => `${name} ${unit}`
  * a recipe already opened rather than beside it.
  */
 function mergeRow(rows, name, quantity, unit) {
+  if (isExcluded(name)) return
+
   // A volume of oil weighs less than the same volume of water, so the
   // ingredient's own density is what turns "50 cL" into the grams every row
   // is merged in.
   const amount = toBaseAmount(quantity, unit, { density: densityOf(name) ?? undefined })
   const key = itemKey(name, amount.unit)
-  if (state.excluded.includes(key)) return
 
   const existing = rows.get(key)
   if (existing) {
@@ -142,8 +152,8 @@ export function useShoppingList() {
 
     // Typing something in is an explicit answer to having removed it before,
     // so it stops being excluded rather than being added back invisibly.
-    const key = itemKey(trimmed, toBaseAmount(quantity, unit, { density: densityOf(trimmed) ?? undefined }).unit)
-    state.excluded = state.excluded.filter(id => id !== key)
+    const key = normalizeIngredientName(trimmed)
+    state.excluded = state.excluded.filter(excluded => excluded !== key)
 
     persist()
   }
@@ -154,9 +164,10 @@ export function useShoppingList() {
     persist()
   }
 
-  /** Excludes the ingredient from the derived list, e.g. because it's already in the pantry. */
+  /** Excludes the row's ingredient from the derived list, e.g. because it's already in the pantry. */
   function removeItem(id) {
-    if (!state.excluded.includes(id)) state.excluded.push(id)
+    const row = shoppingList.value.find(item => item.id === id)
+    if (row && !isExcluded(row.name)) state.excluded.push(normalizeIngredientName(row.name))
     delete state.checked[id]
     persist()
   }

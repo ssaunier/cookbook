@@ -266,7 +266,7 @@ describe('ShoppingListView', () => {
   })
 
   it('keeps a small liquid amount in millilitres', async () => {
-    await addRecipe(makeRecipe({ ingredients: [ingredient('huile d’olive', 25, 'cl')] }), 1)
+    await addRecipe(makeRecipe({ ingredients: [ingredient('huile de colza', 25, 'cl')] }), 1)
     const view = await mountView(ShoppingListView)
 
     expect(view.text()).toContain('250 mL')

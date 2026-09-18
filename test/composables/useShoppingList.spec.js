@@ -109,7 +109,8 @@ describe('addRecipe', () => {
   })
 
   it('weighs a volume of oil at its own density, not water’s', async () => {
-    const recipe = makeRecipe({ ingredients: [ingredient('huile d’olive', 1, 'L')] })
+    // Colza rather than olive: olive oil is a staple no recipe puts on the list.
+    const recipe = makeRecipe({ ingredients: [ingredient('huile de colza', 1, 'L')] })
     const list = await withRecipes([recipe])
     list.addRecipe(recipe, 1)
 
@@ -159,13 +160,16 @@ describe('addRecipe', () => {
     expect(list.shoppingList.value.filter(item => item.checked)).toHaveLength(1)
   })
 
-  it('always excludes pantry staples like water, salt and pepper', async () => {
+  it('always excludes pantry staples like water, salt, pepper and olive oil', async () => {
     const recipe = makeRecipe({
       ingredients: [
         ingredient('avocado', 1),
         ingredient('Eau', 200, 'ml'),
         ingredient(' sel ', 5, 'g'),
-        ingredient('POIVRE', 1, 'pincée')
+        ingredient('POIVRE', 1, 'pincée'),
+        ingredient("huile d'olive", 20, 'g'),
+        // The apostrophe a phone keyboard types, not the one recipes use.
+        ingredient('Huile d’olive', 3, 'cuillères à soupe')
       ]
     })
     const list = await withRecipes([recipe])
@@ -294,16 +298,52 @@ describe('mutations', () => {
     expect(list.shoppingList.value).toHaveLength(2)
   })
 
-  it('records an exclusion once, however often it is asked for', async () => {
+  it('records an exclusion once, by name, however often it is asked for', async () => {
     const list = await withRecipes([makeRecipe()])
     list.addRecipe(makeRecipe(), 1)
-    const [{ id }] = list.shoppingList.value
+    const [{ id, name }] = list.shoppingList.value
 
     list.removeItem(id)
     list.removeItem(id)
 
     expect(list.shoppingList.value).toHaveLength(2)
-    expect(list.state.excluded).toEqual([id])
+    expect(list.state.excluded).toEqual([name])
+  })
+
+  it('keeps an ingredient excluded whatever unit the next recipe measures it in', async () => {
+    // Spoons never convert to grams, so these two land on different rows;
+    // removing one is still about the beurre, not about the spoon.
+    const spoons = makeRecipe({ slug: 'spoons', ingredients: [ingredient('beurre', 3, 'cuillères à soupe')] })
+    const grams = makeRecipe({ slug: 'grams', ingredients: [ingredient('beurre', 20, 'g')] })
+    const list = await withRecipes([spoons, grams])
+    list.addRecipe(spoons, 1)
+    list.removeItem(list.shoppingList.value[0].id)
+
+    list.addRecipe(grams, 1)
+
+    expect(list.shoppingList.value).toEqual([])
+  })
+
+  it('matches an exclusion however the next recipe spells the name', async () => {
+    const lower = makeRecipe({ slug: 'lower', ingredients: [ingredient("huile d'arachide", 10, 'g')] })
+    const upper = makeRecipe({ slug: 'upper', ingredients: [ingredient('Huile d’arachide ', 10, 'g')] })
+    const list = await withRecipes([lower, upper])
+    list.addRecipe(lower, 1)
+    list.removeItem(list.shoppingList.value[0].id)
+
+    list.addRecipe(upper, 1)
+
+    expect(list.shoppingList.value).toEqual([])
+  })
+
+  it('ignores a removal for an unknown id', async () => {
+    const list = await withRecipes([makeRecipe()])
+    list.addRecipe(makeRecipe(), 1)
+
+    list.removeItem('nope')
+
+    expect(list.state.excluded).toEqual([])
+    expect(list.shoppingList.value).toHaveLength(3)
   })
 
   it('clears the list, the menu and the hand-added items together', async () => {
