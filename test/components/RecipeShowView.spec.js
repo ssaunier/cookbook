@@ -14,6 +14,13 @@ describe('RecipeShowView', () => {
     expect(view.text()).toContain('Some people call it guac.')
   })
 
+  it('puts the recipe name in the document title, and restores it on leaving', async () => {
+    const view = await show([makeRecipe()], 'guacamole')
+    expect(document.title).toBe('Guacamole - Cookbook')
+    view.unmount()
+    expect(document.title).toBe('Cookbook')
+  })
+
   it('shows quantities, units and the yield', async () => {
     const view = await show([makeRecipe()], 'guacamole')
     expect(view.text()).toContain('0.5 teaspoon')
