@@ -14,6 +14,13 @@ const ESCAPED_PREFIX = PREFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 /** Recipes live under this directory in the source repository. */
 const RECIPE_PATH = new RegExp(`^${ESCAPED_PREFIX}.+\\.md$`, 'i')
 
+/**
+ * Optional per-recipe metadata sitting next to `recipe.md`, e.g.
+ * `recipes/pain-pita/meta.yml`. It is picked up from the same repository tree
+ * as the recipes, so reading it costs no extra API call.
+ */
+const META_PATH = new RegExp(`^${ESCAPED_PREFIX}.+/meta\\.ya?ml$`, 'i')
+
 /** Yield units that describe a number of eaters rather than a volume. */
 const SERVING_UNITS = /^(servings?|portions?|persons?|people|personnes?|pers\.?|parts?|couverts?)$/i
 
@@ -83,7 +90,7 @@ export async function downloadRecipes(sha, previousFiles = {}) {
   }
 
   const entries = tree.tree
-    .filter(item => item.type === 'blob' && RECIPE_PATH.test(item.path))
+    .filter(item => item.type === 'blob' && (RECIPE_PATH.test(item.path) || META_PATH.test(item.path)))
     .map(item => ({ path: item.path, sha: item.sha }))
 
   const files = {}
@@ -121,7 +128,9 @@ export async function downloadRecipes(sha, previousFiles = {}) {
       }
       return
     }
-    files[path] = { sha: blobSha, recipe: toRecipe(text, path) }
+    files[path] = META_PATH.test(path)
+      ? { sha: blobSha, meta: toMeta(text, path) }
+      : { sha: blobSha, recipe: toRecipe(text, path) }
   })
 
   return { files, complete }
@@ -134,7 +143,23 @@ export async function downloadRecipes(sha, previousFiles = {}) {
  * useRecipes() rather than here: the locale can change without a re-download.
  */
 export function filesToRecipes(files) {
-  return Object.values(files).map(file => file.recipe).filter(Boolean)
+  const entries = Object.values(files)
+  const toTest = new Set(entries.filter(file => file.meta?.toTest).map(file => file.meta.slug))
+  return entries
+    .map(file => file.recipe)
+    .filter(Boolean)
+    .map(recipe => (toTest.has(recipe.slug) ? { ...recipe, toTest: true } : recipe))
+}
+
+/**
+ * Reads a `meta.yml`. Only flat `key: value` lines are understood, which is
+ * all the file holds: `to_test: true` marks a recipe not cooked yet.
+ */
+export function toMeta(yaml, path) {
+  return {
+    slug: toSlug(path),
+    toTest: /^to_test:\s*(?:true|yes)\s*(?:#.*)?$/im.test(yaml)
+  }
 }
 
 /**
@@ -174,8 +199,8 @@ export function toRecipe(markdown, path) {
 function toSlug(path) {
   return path
     .replace(new RegExp(`^${ESCAPED_PREFIX}`, 'i'), '')
-    .replace(/\.md$/i, '')
-    .replace(/\/recipe$/i, '')
+    .replace(/\.(?:md|ya?ml)$/i, '')
+    .replace(/\/(?:recipe|meta)$/i, '')
     .replace(/\//g, '-')
 }
 

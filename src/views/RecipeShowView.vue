@@ -47,6 +47,7 @@ function added(multiplier) {
     <article class="mt-5 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
       <header class="border-b border-slate-100 bg-gradient-to-br from-blue-50 via-white to-sky-50 p-6 sm:p-10">
         <div class="flex flex-wrap gap-2">
+          <span v-if="recipe.toTest" class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">{{ t('index.toTest') }}</span>
           <span v-for="tag in recipe.tags" :key="tag" class="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{{ tag }}</span>
         </div>
         <!-- On desktop the button sits beside the title; on a phone that would

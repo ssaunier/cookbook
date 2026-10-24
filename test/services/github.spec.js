@@ -225,6 +225,22 @@ describe('downloadRecipes', () => {
     ])
   })
 
+  it('flags a recipe whose meta.yml says to_test: true', async () => {
+    stubFetch({
+      '/git/trees/': tree('recipes/a/recipe.md', 'recipes/a/meta.yml', 'recipes/b/recipe.md', 'recipes/b/meta.yml'),
+      'recipes/a/recipe.md': fullRecipe,
+      'recipes/a/meta.yml': 'to_test: true\n',
+      'recipes/b/recipe.md': groups,
+      'recipes/b/meta.yml': 'to_test: false\n'
+    })
+
+    const { files, complete } = await downloadRecipes('head')
+    const bySlug = Object.fromEntries(filesToRecipes(files).map(item => [item.slug, item]))
+    expect(bySlug.a.toTest).toBe(true)
+    expect(bySlug.b.toTest).toBeUndefined()
+    expect(complete).toBe(true)
+  })
+
   it('ignores files outside recipes/', async () => {
     stubFetch({ '/git/trees/': tree('README.md', 'docs/notes.md'), 'x': '' })
     expect(filesToRecipes((await downloadRecipes('head')).files)).toEqual([])

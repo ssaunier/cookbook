@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { flushPromises } from '@vue/test-utils'
 import RecipeIndexView from '../../src/views/RecipeIndexView.vue'
 import { i18n } from '../../src/i18n/index.js'
 import { ingredient, makeRecipe, mountView } from '../helpers.js'
@@ -175,5 +176,20 @@ describe('RecipeIndexView', () => {
     i18n.global.locale.value = 'fr'
     await view.vm.$nextTick()
     expect(view.text()).toContain('3 ingrédients')
+  })
+
+  it('filters on recipes still to be tried, and follows the URL', async () => {
+    const list = [
+      makeRecipe({ slug: 'a', title: 'Alpha', toTest: true }),
+      makeRecipe({ slug: 'b', title: 'Bravo' })
+    ]
+    const view = await mountView(RecipeIndexView, { props: { recipes: list } })
+    expect(view.findAll('a')).toHaveLength(2)
+
+    await view.findAll('button').find(button => button.text() === 'To try').trigger('click')
+    expect(view.findAll('a')).toHaveLength(1)
+    expect(view.text()).toContain('Alpha')
+    await flushPromises()
+    expect(view.vm.$route.query.totest).toBe('1')
   })
 })

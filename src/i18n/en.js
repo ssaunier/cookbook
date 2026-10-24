@@ -29,6 +29,7 @@ export default {
   },
 
   index: {
+    toTest: 'To try',
     searchLabel: 'Search recipes',
     searchPlaceholder: 'Search recipes…',
     all: 'All',
