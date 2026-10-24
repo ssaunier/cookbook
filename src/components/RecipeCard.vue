@@ -9,6 +9,7 @@ const { t } = useI18n()
 <template>
   <RouterLink :to="`/r/${recipe.slug}`" class="group min-w-0 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md">
     <div class="mb-5 flex items-start justify-between gap-3">
+      <span v-if="recipe.toTest" class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">{{ t('index.toTest') }}</span>
       <span class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">{{ t('index.ingredients', { n: recipe.ingredients.length }) }}</span>
       <span class="text-xl transition group-hover:rotate-6">🍽️</span>
     </div>

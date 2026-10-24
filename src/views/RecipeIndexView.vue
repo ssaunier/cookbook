@@ -35,6 +35,7 @@ function sameTag(a, b) {
 
 const query = ref(asText(route.query.q))
 const tag = ref(asText(route.query.tag))
+const toTestOnly = ref(route.query.totest === '1')
 
 /**
  * The URL is the source of truth for both filters, and is re-read on every
@@ -47,10 +48,11 @@ const tag = ref(asText(route.query.tag))
  * another view, where clearing the filters would write this component's state
  * over the query string of a page it no longer owns.
  */
-watch(() => route.query, ({ q, tag: tg }) => {
+watch(() => route.query, ({ q, tag: tg, totest }) => {
   if (route.name !== 'recipes') return
   query.value = asText(q)
   tag.value = asText(tg)
+  toTestOnly.value = totest === '1'
 })
 
 /**
@@ -59,11 +61,13 @@ watch(() => route.query, ({ q, tag: tg }) => {
  * losing it — `replace` (not `push`) keeps every keystroke from adding its own
  * back-button stop.
  */
-watch([query, tag], ([q, tg]) => {
-  router.replace({ query: { ...route.query, q: q || undefined, tag: tg || undefined } })
+watch([query, tag, toTestOnly], ([q, tg, tt]) => {
+  router.replace({ query: { ...route.query, q: q || undefined, tag: tg || undefined, totest: tt ? '1' : undefined } })
 })
 
 const tags = computed(() => [...new Set(props.recipes.flatMap(recipe => recipe.tags || []))].sort(collator.value.compare))
+
+const hasToTest = computed(() => props.recipes.some(recipe => recipe.toTest))
 
 const filtered = computed(() => {
   const needle = query.value.trim().toLowerCase()
@@ -71,7 +75,8 @@ const filtered = computed(() => {
     const haystack = `${recipe.title} ${recipe.description} ${(recipe.tags || []).join(' ')} ${recipe.ingredients.map(ingredient => ingredient.name).join(' ')}`
     const matchesText = !needle || haystack.toLowerCase().includes(needle)
     const matchesTag = !tag.value || (recipe.tags || []).some(item => sameTag(item, tag.value))
-    return matchesText && matchesTag
+    const matchesToTest = !toTestOnly.value || recipe.toTest
+    return matchesText && matchesTag && matchesToTest
   })
 })
 
@@ -109,8 +114,9 @@ onUnmounted(() => window.removeEventListener('keydown', focusOnSlash))
       </div>
     </div>
 
-    <div v-if="tags.length" class="mb-6 flex flex-wrap gap-2">
+    <div v-if="tags.length || hasToTest" class="mb-6 flex flex-wrap gap-2">
       <button @click="tag = ''" :class="['rounded-full px-3 py-1.5 text-sm font-semibold', !tag ? 'bg-slate-900 text-white' : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:text-slate-900']">{{ t('index.all') }}</button>
+      <button v-if="hasToTest" @click="toTestOnly = !toTestOnly" :aria-pressed="toTestOnly" :class="['rounded-full px-3 py-1.5 text-sm font-semibold', toTestOnly ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100']">{{ t('index.toTest') }}</button>
       <button v-for="item in tags" :key="item" @click="tag = item" :class="['rounded-full px-3 py-1.5 text-sm font-semibold', sameTag(tag, item) ? 'bg-blue-600 text-white' : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:text-slate-900']">{{ item }}</button>
     </div>
 
