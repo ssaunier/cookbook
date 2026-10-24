@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AddToShoppingListDialog from '../components/AddToShoppingListDialog.vue'
@@ -16,6 +16,14 @@ const { addRecipe } = useShoppingList()
 const showDialog = ref(false)
 
 const recipe = computed(() => props.recipes.find(item => item.slug === route.params.slug))
+
+// Post-flush so a locale switch, which resets the title in useLocale, is
+// followed by this one rather than the other way round.
+watch([recipe, () => t('app.title')], ([current, appTitle]) => {
+  document.title = current ? `${current.title} - ${appTitle}` : appTitle
+}, { immediate: true, flush: 'post' })
+
+onBeforeUnmount(() => { document.title = t('app.title') })
 
 /** Keep the parser's order, but bundle consecutive ingredients of one group. */
 const groups = computed(() => {
