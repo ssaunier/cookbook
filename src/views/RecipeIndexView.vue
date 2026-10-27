@@ -33,6 +33,15 @@ function sameTag(a, b) {
   return asText(a).normalize('NFC') === asText(b).normalize('NFC')
 }
 
+/**
+ * Case- and accent-insensitive form of a text, for search matching: NFD splits
+ * `é` into `e` plus a combining mark, which is then dropped, so `epinard`
+ * finds `épinard` and the other way round.
+ */
+function foldText(value) {
+  return asText(value).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+}
+
 const query = ref(asText(route.query.q))
 const tag = ref(asText(route.query.tag))
 const toTestOnly = ref(route.query.totest === '1')
@@ -70,10 +79,10 @@ const tags = computed(() => [...new Set(props.recipes.flatMap(recipe => recipe.t
 const hasToTest = computed(() => props.recipes.some(recipe => recipe.toTest))
 
 const filtered = computed(() => {
-  const needle = query.value.trim().toLowerCase()
+  const needle = foldText(query.value.trim())
   return props.recipes.filter(recipe => {
     const haystack = `${recipe.title} ${recipe.description} ${(recipe.tags || []).join(' ')} ${recipe.ingredients.map(ingredient => ingredient.name).join(' ')}`
-    const matchesText = !needle || haystack.toLowerCase().includes(needle)
+    const matchesText = !needle || foldText(haystack).includes(needle)
     const matchesTag = !tag.value || (recipe.tags || []).some(item => sameTag(item, tag.value))
     const matchesToTest = !toTestOnly.value || recipe.toTest
     return matchesText && matchesTag && matchesToTest
