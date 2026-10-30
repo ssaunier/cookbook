@@ -43,6 +43,8 @@ export default {
     back: 'Toutes les recettes',
     makes: 'Pour {yields}',
     addToList: 'Ajouter à la liste de courses',
+    addIngredient: 'Ajouter {name} à la liste de courses',
+    ingredientAdded: 'Ajouté à la liste de courses',
     ingredients: 'Ingrédients',
     noIngredients: 'Cette recette ne liste aucun ingrédient.',
     method: 'Préparation',

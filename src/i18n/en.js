@@ -43,6 +43,8 @@ export default {
     back: 'All recipes',
     makes: 'Makes {yields}',
     addToList: 'Add to shopping list',
+    addIngredient: 'Add {name} to shopping list',
+    ingredientAdded: 'Added to shopping list',
     ingredients: 'Ingredients',
     noIngredients: 'This recipe lists no ingredients.',
     method: 'Method',

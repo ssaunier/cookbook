@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useShoppingList } from '../../src/composables/useShoppingList.js'
 import { flushPromises } from '@vue/test-utils'
 import RecipeShowView from '../../src/views/RecipeShowView.vue'
 import { toRecipe } from '../../src/services/github.js'
@@ -147,5 +148,42 @@ describe('RecipeShowView', () => {
     await flushPromises()
 
     expect(view.vm.$route.path).toBe('/shopping-list')
+  })
+
+  describe('adding a single ingredient', () => {
+    beforeEach(() => {
+      localStorage.clear()
+      useShoppingList().clearList()
+    })
+
+    it('adds the ingredient as shown, without opening the dialog', async () => {
+      const view = await show([makeRecipe()], 'guacamole')
+      const { state } = useShoppingList()
+
+      await view.find('button[aria-label="Add salt to shopping list"]').trigger('click')
+
+      expect(state.extras).toMatchObject([{ name: 'salt', quantity: 0.5, unit: 'teaspoon' }])
+      expect(state.menu).toHaveLength(0)
+      expect(view.text()).not.toContain('Multiplier')
+      expect(view.vm.$route.path).toBe('/r/guacamole')
+    })
+
+    it('confirms the add on the button, then goes back to a plus', async () => {
+      vi.useFakeTimers()
+      try {
+        const view = await show([makeRecipe()], 'guacamole')
+        const button = view.find('button[aria-label="Add avocado to shopping list"]')
+
+        await button.trigger('click')
+        expect(button.find('path').attributes('d')).toBe('M4 10.5l4 4 8-9')
+        expect(view.find('[role="status"]').text()).toBe('Added to shopping list')
+
+        await vi.advanceTimersByTimeAsync(1500)
+        expect(button.find('path').attributes('d')).toBe('M10 4v12M4 10h12')
+        expect(view.find('[role="status"]').text()).toBe('')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 })
