@@ -98,10 +98,10 @@ function added(multiplier) {
           <p class="sr-only" role="status">{{ justAdded ? t('recipe.ingredientAdded') : '' }}</p>
           <p v-if="!recipe.ingredients.length" class="mt-3 text-sm text-slate-400">{{ t('recipe.noIngredients') }}</p>
 
-          <div v-for="(group, groupIndex) in groups" :key="group.title" class="mt-4">
-            <h3 v-if="group.title" class="text-xs font-black uppercase tracking-[0.14em] text-slate-400">{{ group.title }}</h3>
+          <div v-for="(group, groupIndex) in groups" :key="group.title" class="mt-3">
+            <h3 v-if="group.title" class="mt-1 text-xs font-black uppercase tracking-[0.14em] text-slate-400">{{ group.title }}</h3>
             <ul class="divide-y divide-slate-100">
-              <li v-for="(ingredient, index) in group.items" :key="index" class="group py-3">
+              <li v-for="(ingredient, index) in group.items" :key="index" class="group py-1">
                 <div class="flex items-start gap-3">
                   <span class="mt-2 size-2 shrink-0 rounded-full bg-blue-500"></span>
                   <div class="min-w-0 flex-1">
@@ -115,10 +115,10 @@ function added(multiplier) {
                     type="button"
                     @click="addIngredient(ingredient, `${groupIndex}-${index}`)"
                     :aria-label="t('recipe.addIngredient', { name: stripInline(ingredient.name) })"
-                    :class="['grid size-8 shrink-0 place-items-center rounded-full transition focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100', justAdded === `${groupIndex}-${index}` ? 'bg-emerald-100 text-emerald-700 [@media(hover:hover)]:opacity-100' : 'bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-700']"
+                    :class="['grid size-7 shrink-0 place-items-center rounded-full transition focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100', justAdded === `${groupIndex}-${index}` ? 'bg-emerald-100 text-emerald-700 [@media(hover:hover)]:opacity-100' : 'bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-700']"
                   >
-                    <svg v-if="justAdded === `${groupIndex}-${index}`" class="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>
-                    <svg v-else class="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>
+                    <svg v-if="justAdded === `${groupIndex}-${index}`" class="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>
+                    <svg v-else class="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>
                   </button>
                 </div>
               </li>
