@@ -98,10 +98,10 @@ function added(multiplier) {
           <p class="sr-only" role="status">{{ justAdded ? t('recipe.ingredientAdded') : '' }}</p>
           <p v-if="!recipe.ingredients.length" class="mt-3 text-sm text-slate-400">{{ t('recipe.noIngredients') }}</p>
 
-          <div v-for="(group, groupIndex) in groups" :key="group.title" class="mt-3">
+          <div v-for="(group, groupIndex) in groups" :key="group.title" class="mt-4">
             <h3 v-if="group.title" class="mt-1 text-xs font-black uppercase tracking-[0.14em] text-slate-400">{{ group.title }}</h3>
             <ul class="divide-y divide-slate-100">
-              <li v-for="(ingredient, index) in group.items" :key="index" class="group py-1">
+              <li v-for="(ingredient, index) in group.items" :key="index" class="group py-2">
                 <div class="flex items-start gap-3">
                   <span class="mt-2 size-2 shrink-0 rounded-full bg-blue-500"></span>
                   <div class="min-w-0 flex-1">
