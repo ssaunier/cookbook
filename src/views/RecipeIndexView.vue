@@ -81,7 +81,7 @@ const hasToTest = computed(() => props.recipes.some(recipe => recipe.toTest))
 const filtered = computed(() => {
   const needle = foldText(query.value.trim())
   return props.recipes.filter(recipe => {
-    const haystack = `${recipe.title} ${recipe.description} ${(recipe.tags || []).join(' ')} ${recipe.ingredients.map(ingredient => ingredient.name).join(' ')}`
+    const haystack = `${recipe.title} ${recipe.description} ${(recipe.tags || []).join(' ')} ${recipe.ingredients.map(ingredient => ingredient.name).join(' ')} ${(recipe.sources || []).map(source => source.title).join(' ')}`
     const matchesText = !needle || foldText(haystack).includes(needle)
     const matchesTag = !tag.value || (recipe.tags || []).some(item => sameTag(item, tag.value))
     const matchesToTest = !toTestOnly.value || recipe.toTest

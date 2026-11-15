@@ -53,6 +53,22 @@ describe('RecipeIndexView', () => {
     expect(view.text()).not.toContain('Guacamole')
   })
 
+  it('searches the source too, without regard to case or accents', async () => {
+    const cited = [
+      makeRecipe({ slug: 'guac', title: 'Guacamole', sources: [{ title: 'Cuisine de Charlotte, p. 12', url: null }] }),
+      makeRecipe({ slug: 'tarte', title: 'Tarte Tatin', sources: [{ title: 'Le Cordon Bleu', url: 'https://example.com' }] })
+    ]
+    const view = await mountView(RecipeIndexView, { props: { recipes: cited } })
+    await view.find('#recipe-search').setValue('charlotte')
+
+    expect(view.text()).toContain('Guacamole')
+    expect(view.text()).not.toContain('Tarte Tatin')
+
+    await view.find('#recipe-search').setValue('CORDON BLEÙ')
+    expect(view.text()).toContain('Tarte Tatin')
+    expect(view.text()).not.toContain('Guacamole')
+  })
+
   it('filters by tag and offers every tag once, sorted', async () => {
     const view = await mountView(RecipeIndexView, { props: { recipes } })
     const labels = view.findAll('button').map(button => button.text())
