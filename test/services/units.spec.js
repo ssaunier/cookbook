@@ -85,7 +85,17 @@ describe('formatAmount', () => {
     [4, '', '4'],
     [0, 'g', '0 g'],
     [1 / 3, 'l', '0.333 l'],
-    [null, 'g', '']
+    [null, 'g', ''],
+    [0.5, null, '½'],
+    [1.5, '', '1½'],
+    [0.25, undefined, '¼'],
+    [0.75, '', '¾'],
+    [0.33, '', '⅓'],
+    [0.67, '', '⅔'],
+    [2.5, '', '2½'],
+    [0.5, 'kg', '0.5 kg'],
+    [0.4, '', '0.4'],
+    [0.99, '', '0.99']
   ])('formats %s %s', (quantity, unit, expected) => {
     expect(formatAmount(quantity, unit)).toBe(expected)
   })
