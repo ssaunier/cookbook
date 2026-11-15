@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useShoppingList } from '../composables/useShoppingList.js'
 import { useLocale } from '../composables/useLocale.js'
 import { stripInline } from '../services/markdown.js'
-import { toDisplayAmount } from '../services/units.js'
+import { toDisplayAmount, toFraction } from '../services/units.js'
 import { densityOf } from '../services/densities.js'
 import { pluralizeIngredientName, shouldPluralize } from '../services/pluralize.js'
 import AddShoppingItemDialog from '../components/AddShoppingItemDialog.vue'
@@ -119,6 +119,10 @@ function formatQuantity(item) {
   // Weighing is the recipe page's business; here the amount should read the
   // way the thing is sold, which for a liquid is by volume.
   const { quantity, unit } = toDisplayAmount(item.quantity, item.unit, { density: densityOf(item.name) })
+  if (!unit) {
+    const figure = toFraction(quantity)
+    return typeof figure === 'number' ? figure.toLocaleString(locale.value) : figure
+  }
   const rounded = Math.round(quantity * 100) / 100
   return `${rounded.toLocaleString(locale.value)} ${unit}`.trim()
 }

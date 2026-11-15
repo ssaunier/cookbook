@@ -141,6 +141,25 @@ const PRECISION = 1000
  */
 export function formatAmount(quantity, unit) {
   if (quantity == null) return ''
+  const figure = unit ? Math.round(quantity * PRECISION) / PRECISION : toFraction(quantity)
+  return [figure, unit].filter(value => value || value === 0).join(' ')
+}
+
+const FRACTIONS = [[0.25, '¼'], [1 / 3, '⅓'], [0.5, '½'], [2 / 3, '⅔'], [0.75, '¾']]
+const FRACTION_TOLERANCE = 0.005
+
+/**
+ * A count of things ("½ aubergine", "1½ oignon") reads better with a vulgar
+ * fraction than with a decimal. Only the usual fractions are used, and only
+ * when the figure is within rounding distance of one; anything else keeps its
+ * rounded decimal form. Meant for amounts without a unit.
+ */
+export function toFraction(quantity) {
   const rounded = Math.round(quantity * PRECISION) / PRECISION
-  return [rounded, unit].filter(value => value || value === 0).join(' ')
+  if (!Number.isFinite(quantity) || quantity < 0) return rounded
+  const whole = Math.floor(quantity + FRACTION_TOLERANCE)
+  const rest = quantity - whole
+  const match = FRACTIONS.find(([value]) => Math.abs(rest - value) < FRACTION_TOLERANCE)
+  if (!match) return rounded
+  return whole ? `${whole}${match[1]}` : match[1]
 }
