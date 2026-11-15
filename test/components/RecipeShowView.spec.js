@@ -88,6 +88,25 @@ describe('RecipeShowView', () => {
     expect(link.attributes('target')).toBe('_blank')
   })
 
+  it('shows the parenthetical of an ingredient as one tag per item, after the name', async () => {
+    const recipe = makeRecipe({
+      ingredients: [ingredient('fromage râpé (emmental, comté)', 100, 'g'), ingredient('malt diastatique (facultatif)')]
+    })
+    const view = await show([recipe], 'guacamole')
+    const [cheese, malt] = view.findAll('ul li')
+
+    expect(cheese.text()).toBe('100 gfromage râpéemmentalcomté')
+    expect(cheese.text()).not.toContain('(')
+    expect(cheese.findAll('[class*="rounded-full"][class*="border"]').map(tag => tag.text())).toEqual(['emmental', 'comté'])
+    expect(malt.findAll('[class*="rounded-full"][class*="border"]').map(tag => tag.text())).toEqual(['facultatif'])
+  })
+
+  it('names the add button after the ingredient without its parenthetical', async () => {
+    const recipe = makeRecipe({ ingredients: [ingredient('malt diastatique (facultatif)')] })
+    const view = await show([recipe], 'guacamole')
+    expect(view.find('ul li button').attributes('aria-label')).toBe('Add malt diastatique to shopping list')
+  })
+
   it('opens an ingredient link in a new tab', async () => {
     const markdown = '# Cake\n\n---\n\n- *1* [egg](https://example.org/e)\n'
     const view = await show([toRecipe(markdown, 'recipes/cake/recipe.md')], 'cake')

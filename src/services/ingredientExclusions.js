@@ -1,3 +1,5 @@
+import { splitIngredientName } from './ingredientNames.js'
+
 /**
  * Ingredients that never belong on a shopping list, no matter which recipe
  * calls for them or how much of it: kitchen staples nobody actually shops
@@ -14,10 +16,11 @@ const ALWAYS_EXCLUDED_NAMES = ['eau', 'sel', 'poivre', "huile d'olive"]
  * How an ingredient name is compared, wherever two spellings should count
  * as the same thing to buy: case, surrounding whitespace and the choice of
  * apostrophe ("huile d'olive" typed on a phone comes out as "huile d’olive")
- * do not make it a different ingredient.
+ * and a parenthetical qualifier ("sel (facultatif)") do not make it a
+ * different ingredient.
  */
 export function normalizeIngredientName(name) {
-  return (name || '').trim().toLowerCase().replace(/[’‘]/g, "'")
+  return splitIngredientName(name).base.toLowerCase().replace(/[’‘]/g, "'")
 }
 
 export function isAlwaysExcludedIngredient(name) {

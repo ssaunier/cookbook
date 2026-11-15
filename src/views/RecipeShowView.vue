@@ -6,6 +6,7 @@ import AddToShoppingListDialog from '../components/AddToShoppingListDialog.vue'
 import { useShoppingList } from '../composables/useShoppingList.js'
 import { renderInline, stripInline } from '../services/markdown.js'
 import { formatAmount } from '../services/units.js'
+import { splitIngredientName } from '../services/ingredientNames.js'
 import { pluralizeIngredientName, shouldPluralize } from '../services/pluralize.js'
 
 const props = defineProps({ recipes: { type: Array, required: true } })
@@ -46,7 +47,8 @@ const groups = computed(() => {
 })
 
 function displayName(ingredient) {
-  return shouldPluralize(ingredient.quantity, ingredient.unit) ? pluralizeIngredientName(ingredient.name) : ingredient.name
+  const { base } = splitIngredientName(ingredient.name)
+  return shouldPluralize(ingredient.quantity, ingredient.unit) ? pluralizeIngredientName(base) : base
 }
 
 /**
@@ -108,13 +110,18 @@ function added(multiplier) {
                     <span v-if="ingredient.quantity != null" class="font-bold text-slate-900">{{ formatAmount(ingredient.quantity, ingredient.unit) }}</span>
                     <a v-if="ingredient.link" :href="ingredient.link" target="_blank" rel="noreferrer" :class="['markdown font-medium text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-800', { 'ml-1': ingredient.quantity != null }]" v-html="renderInline(displayName(ingredient))"></a>
                     <span v-else :class="['markdown font-medium text-slate-700', { 'ml-1': ingredient.quantity != null }]" v-html="renderInline(displayName(ingredient))"></span>
+                    <span
+                      v-for="tag in splitIngredientName(ingredient.name).tags"
+                      :key="tag"
+                      class="ml-1.5 inline-block rounded-full border border-slate-200 px-[9px] py-0.5 align-middle text-[11.5px] leading-snug font-medium text-slate-500"
+                    >{{ tag }}</span>
                   </div>
                   <!-- Always visible, except where a pointer can hover: there it
                        appears with the row, and with keyboard focus. -->
                   <button
                     type="button"
                     @click="addIngredient(ingredient, `${groupIndex}-${index}`)"
-                    :aria-label="t('recipe.addIngredient', { name: stripInline(ingredient.name) })"
+                    :aria-label="t('recipe.addIngredient', { name: stripInline(splitIngredientName(ingredient.name).base) })"
                     :class="['grid size-7 shrink-0 place-items-center rounded-full transition focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100', justAdded === `${groupIndex}-${index}` ? 'bg-emerald-100 text-emerald-700 [@media(hover:hover)]:opacity-100' : 'bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-700']"
                   >
                     <svg v-if="justAdded === `${groupIndex}-${index}`" class="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>

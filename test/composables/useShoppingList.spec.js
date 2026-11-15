@@ -403,3 +403,42 @@ describe('persistence', () => {
     ])
   })
 })
+
+describe('parenthetical qualifiers', () => {
+  it('groups an ingredient with the same one qualified in parentheses', async () => {
+    const bread = makeRecipe({ slug: 'bread', title: 'Bread', ingredients: [ingredient('malt diastatique', 5, 'g')] })
+    const bun = makeRecipe({ slug: 'bun', title: 'Bun', ingredients: [ingredient('malt diastatique (facultatif)', 3, 'g')] })
+    const list = await withRecipes([bread, bun])
+    list.addRecipe(bun, 1)
+    list.addRecipe(bread, 1)
+
+    expect(list.shoppingList.value).toHaveLength(1)
+    expect(list.shoppingList.value[0]).toMatchObject({ name: 'malt diastatique', quantity: 8, unit: 'g' })
+  })
+
+  it('shows the name without its parenthetical, whichever recipe came first', async () => {
+    const bun = makeRecipe({ slug: 'bun', title: 'Bun', ingredients: [ingredient('malt diastatique (facultatif)', 3, 'g')] })
+    const list = await withRecipes([bun])
+    list.addRecipe(bun, 1)
+
+    expect(list.shoppingList.value[0].name).toBe('malt diastatique')
+  })
+
+  it('still keeps apart two ingredients whose names differ outside the parentheses', async () => {
+    const recipe = makeRecipe({
+      ingredients: [ingredient('farine (T65)', 100, 'g'), ingredient('sucre (blond)', 50, 'g')]
+    })
+    const list = await withRecipes([recipe])
+    list.addRecipe(recipe, 1)
+
+    expect(list.shoppingList.value.map(item => item.name).sort()).toEqual(['farine', 'sucre'])
+  })
+
+  it('treats a staple qualified in parentheses as the staple', async () => {
+    const recipe = makeRecipe({ ingredients: [ingredient('sel (facultatif)', 1, 'g'), ingredient('farine', 100, 'g')] })
+    const list = await withRecipes([recipe])
+    list.addRecipe(recipe, 1)
+
+    expect(list.shoppingList.value.map(item => item.name)).toEqual(['farine'])
+  })
+})
