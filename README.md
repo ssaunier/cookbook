@@ -34,7 +34,7 @@ npm run dev
 | `npm run test:watch` | The suite in watch mode |
 | `npm run coverage` | Coverage report |
 
-Node 22 or newer is required.
+Node 22 or newer is required; CI and deployment use Node 26 (see `.nvmrc`).
 
 ## Pointing it at your own recipes
 
