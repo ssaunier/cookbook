@@ -3,6 +3,7 @@ import { loadAppState, saveAppState } from '../services/storage.js'
 import { toBaseAmount } from '../services/units.js'
 import { densityOf } from '../services/densities.js'
 import { isAlwaysExcludedIngredient, normalizeIngredientName } from '../services/ingredientExclusions.js'
+import { splitIngredientName } from '../services/ingredientNames.js'
 import { useRecipes } from './useRecipes.js'
 
 const state = reactive(loadAppState())
@@ -16,7 +17,11 @@ function persist() {
   })
 }
 
-/** Identifies the same thing to buy across recipes: two recipes that both want butter share one row. */
+/**
+ * Identifies the same thing to buy across recipes: two recipes that both want
+ * butter share one row. A parenthetical qualifier is left out of it, so
+ * "malt diastatique (facultatif)" shares the row of "malt diastatique".
+ */
 const itemKey = (name, unit) => `${name} ${unit}`
 
 /**
@@ -41,8 +46,9 @@ function mergeRow(rows, name, quantity, unit) {
   // A volume of oil weighs less than the same volume of water, so the
   // ingredient's own density is what turns "50 cL" into the grams every row
   // is merged in.
-  const amount = toBaseAmount(quantity, unit, { density: densityOf(name) ?? undefined })
-  const key = itemKey(name, amount.unit)
+  const { base } = splitIngredientName(name)
+  const amount = toBaseAmount(quantity, unit, { density: densityOf(base) ?? undefined })
+  const key = itemKey(base, amount.unit)
 
   const existing = rows.get(key)
   if (existing) {
@@ -52,7 +58,7 @@ function mergeRow(rows, name, quantity, unit) {
 
   rows.set(key, {
     id: key,
-    name,
+    name: base,
     unit: amount.unit,
     quantity: amount.quantity,
     checked: Boolean(state.checked[key]),
